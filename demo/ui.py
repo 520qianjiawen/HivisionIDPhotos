@@ -33,7 +33,7 @@ def create_ui(
     else:
         DEFAULT_LANG = language[0]
 
-    DEFAULT_HUMAN_MATTING_MODEL = "modnet_photographic_portrait_matting"
+    DEFAULT_HUMAN_MATTING_MODEL = "birefnet-v1-lite"
     DEFAULT_FACE_DETECT_MODEL = "retinaface-resnet50"
 
     if DEFAULT_HUMAN_MATTING_MODEL in human_matting_models:
@@ -43,7 +43,7 @@ def create_ui(
     if DEFAULT_FACE_DETECT_MODEL not in face_detect_models:
         DEFAULT_FACE_DETECT_MODEL = "mtcnn"
 
-    demo = gr.Blocks(title="HivisionIDPhotos")
+    demo = gr.Blocks(title="一键制作证件照", css="footer {display: none !important;}")
 
     with demo:
         gr.HTML(load_description(os.path.join(root_dir, "demo/assets/title.md")))

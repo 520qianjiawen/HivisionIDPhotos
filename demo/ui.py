@@ -43,7 +43,7 @@ def create_ui(
     if DEFAULT_FACE_DETECT_MODEL not in face_detect_models:
         DEFAULT_FACE_DETECT_MODEL = "mtcnn"
 
-    demo = gr.Blocks(title="一键制作证件照", css="footer {display: none !important;}")
+    demo = gr.Blocks(title="一键制作证件照")
 
     with demo:
         gr.HTML(load_description(os.path.join(root_dir, "demo/assets/title.md")))

@@ -19,12 +19,23 @@ HUMAN_MATTING_MODELS_CHOICE = [
     model for model in HUMAN_MATTING_MODELS if model in HUMAN_MATTING_MODELS_EXIST
 ]
 
-if len(HUMAN_MATTING_MODELS_CHOICE) == 0:
-    raise ValueError(
-        "未找到任何存在的人像分割模型，请检查 hivision/creator/weights 目录下的文件"
-        + "\n"
-        + "No existing portrait segmentation model was found, please check the files in the hivision/creator/weights directory."
-    )
+if os.getenv("API_URL"):
+    print(f"[API Mode] Frontend will forward requests to {os.getenv('API_URL')}")
+    # 提供默认的下拉列表选项，因为后端一定会有这些模型
+    if len(HUMAN_MATTING_MODELS_CHOICE) == 0:
+        HUMAN_MATTING_MODELS_CHOICE = [
+            "birefnet-v1-lite",
+            "hivision_modnet",
+            "modnet_photographic_portrait_matting",
+            "rmbg-1.4"
+        ]
+else:
+    if len(HUMAN_MATTING_MODELS_CHOICE) == 0:
+        raise ValueError(
+            "未找到任何存在的人像分割模型，请检查 hivision/creator/weights 目录下的文件"
+            + "\n"
+            + "No existing portrait segmentation model was found, please check the files in the hivision/creator/weights directory."
+        )
 
 FACE_DETECT_MODELS = ["face++ (联网Online API)", "mtcnn"]
 FACE_DETECT_MODELS_EXPAND = (

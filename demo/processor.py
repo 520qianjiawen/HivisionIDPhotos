@@ -20,6 +20,9 @@ import os
 import cv2
 import time
 from demo.locales import LOCALES
+import requests
+import base64
+from hivision.utils import bytes_2_base64, base64_2_numpy
 
 
 base_path = os.path.dirname(os.path.abspath(__file__))
@@ -131,14 +134,37 @@ class IDPhotoProcessor:
         if image_dpi_option == LOCALES["image_dpi"][language]["choices"][-1]:
             idphoto_json["custom_image_dpi"] = custom_image_dpi
 
-        # 创建IDCreator实例并设置处理器
-        creator = IDCreator()
-        choose_handler(creator, matting_model_option, face_detect_option)
+        # 如果设置 API_URL，不再创建 IDCreator
+        api_url = os.environ.get("API_URL")
+        creator = None
+
+        if not api_url:
+            creator = IDCreator()
+            choose_handler(creator, matting_model_option, face_detect_option)
 
         # 生成证件照
         try:
-            result = self._generate_id_photo(
-                creator,
+            if api_url:
+                result = self._generate_id_photo_api(
+                    api_url,
+                    input_image,
+                    idphoto_json,
+                    language,
+                    head_measure_ratio,
+                    top_distance_max,
+                    top_distance_min,
+                    whitening_strength,
+                    brightness_strength,
+                    contrast_strength,
+                    sharpen_strength,
+                    saturation_strength,
+                    face_alignment_option,
+                    matting_model_option,
+                    face_detect_option
+                )
+            else:
+                result = self._generate_id_photo(
+                    creator,
                 input_image,
                 idphoto_json,
                 language,
@@ -318,6 +344,90 @@ class IDPhotoProcessor:
             face_alignment=face_alignment_option,
             horizontal_flip=horizontal_flip_option,
         )
+
+    # API 接口生成证件照
+    def _generate_id_photo_api(
+        self,
+        api_url,
+        input_image,
+        idphoto_json,
+        language,
+        head_measure_ratio,
+        top_distance_max,
+        top_distance_min,
+        whitening_strength,
+        brightness_strength,
+        contrast_strength,
+        sharpen_strength,
+        saturation_strength,
+        face_alignment_option,
+        human_matting_model,
+        face_detect_model
+    ):
+        change_bg_only = (
+            idphoto_json["size_mode"] in LOCALES["size_mode"][language]["choices"][1]
+        )
+        
+        # 将输入图像转为base64
+        _, buffer = cv2.imencode('.jpg', cv2.cvtColor(input_image, cv2.COLOR_RGB2BGR))
+        image_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        if change_bg_only:
+            # 请求抠图接口
+            payload = {
+                "input_image_base64": image_base64,
+                "human_matting_model": human_matting_model,
+                "dpi": 300
+            }
+            res = requests.post(f"{api_url}/human_matting", data=payload)
+            if res.status_code == 200 and res.json().get("status"):
+                standard_img = base64_2_numpy(res.json()["image_base64"])
+                standard_img = cv2.cvtColor(standard_img, cv2.COLOR_BGRA2RGBA)
+                class DummyResult:
+                    def __init__(self, s):
+                        self.standard = s
+                        self.hd = s
+                    def __iter__(self):
+                        return iter((self.standard, self.hd, None, None, None, None))
+                return DummyResult(standard_img)
+            else:
+                raise APIError("Error calling /human_matting API")
+        else:
+            # 请求完整证件照接口
+            payload = {
+                "input_image_base64": image_base64,
+                "height": idphoto_json["size"][0],
+                "width": idphoto_json["size"][1],
+                "human_matting_model": human_matting_model,
+                "face_detect_model": face_detect_model,
+                "hd": True,
+                "dpi": 300,
+                "face_align": face_alignment_option,
+                "whitening_strength": whitening_strength,
+                "head_measure_ratio": head_measure_ratio,
+                "top_distance_max": top_distance_max,
+                "top_distance_min": top_distance_min,
+                "brightness_strength": brightness_strength,
+                "contrast_strength": contrast_strength,
+                "sharpen_strength": sharpen_strength,
+                "saturation_strength": saturation_strength,
+            }
+            res = requests.post(f"{api_url}/idphoto", data=payload)
+            if res.status_code == 200 and res.json().get("status"):
+                standard_img = base64_2_numpy(res.json()["image_base64_standard"])
+                hd_img = base64_2_numpy(res.json()["image_base64_hd"])
+                standard_img = cv2.cvtColor(standard_img, cv2.COLOR_BGRA2RGBA)
+                hd_img = cv2.cvtColor(hd_img, cv2.COLOR_BGRA2RGBA)
+
+                class DummyResult:
+                    def __init__(self, s, h):
+                        self.standard = s
+                        self.hd = h
+                    def __iter__(self):
+                        return iter((self.standard, self.hd, None, None, None, None))
+                return DummyResult(standard_img, hd_img)
+            else:
+                raise APIError("Error calling /idphoto API or No Face Detected")
 
     # 处理照片生成错误
     def _handle_photo_generation_error(self, language):

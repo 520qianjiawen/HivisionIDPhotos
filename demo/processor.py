@@ -382,7 +382,6 @@ class IDPhotoProcessor:
             res = requests.post(f"{api_url}/human_matting", data=payload)
             if res.status_code == 200 and res.json().get("status"):
                 standard_img = base64_2_numpy(res.json()["image_base64"])
-                standard_img = cv2.cvtColor(standard_img, cv2.COLOR_BGRA2RGBA)
                 class DummyResult:
                     def __init__(self, s):
                         self.standard = s
@@ -416,8 +415,6 @@ class IDPhotoProcessor:
             if res.status_code == 200 and res.json().get("status"):
                 standard_img = base64_2_numpy(res.json()["image_base64_standard"])
                 hd_img = base64_2_numpy(res.json()["image_base64_hd"])
-                standard_img = cv2.cvtColor(standard_img, cv2.COLOR_BGRA2RGBA)
-                hd_img = cv2.cvtColor(hd_img, cv2.COLOR_BGRA2RGBA)
 
                 class DummyResult:
                     def __init__(self, s, h):

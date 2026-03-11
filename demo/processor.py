@@ -368,6 +368,13 @@ class IDPhotoProcessor:
             idphoto_json["size_mode"] in LOCALES["size_mode"][language]["choices"][1]
         )
         
+        # 如果图像太大，缩放一下以减少传输带宽和超时风险
+        max_dim = 2000
+        h, w = input_image.shape[:2]
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            input_image = cv2.resize(input_image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
         # 将输入图像转为base64
         _, buffer = cv2.imencode('.jpg', cv2.cvtColor(input_image, cv2.COLOR_RGB2BGR))
         image_base64 = base64.b64encode(buffer).decode('utf-8')

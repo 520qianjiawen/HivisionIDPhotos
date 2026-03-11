@@ -386,18 +386,24 @@ class IDPhotoProcessor:
                 "human_matting_model": human_matting_model,
                 "dpi": 300
             }
-            res = requests.post(f"{api_url}/human_matting", data=payload)
-            if res.status_code == 200 and res.json().get("status"):
-                standard_img = base64_2_numpy(res.json()["image_base64"])
-                class DummyResult:
-                    def __init__(self, s):
-                        self.standard = s
-                        self.hd = s
-                    def __iter__(self):
-                        return iter((self.standard, self.hd, None, None, None, None))
-                return DummyResult(standard_img)
-            else:
-                raise APIError("Error calling /human_matting API")
+            try:
+                res = requests.post(f"{api_url}/human_matting", data=payload, timeout=60)
+                if res.status_code == 200 and res.json().get("status"):
+                    standard_img = base64_2_numpy(res.json()["image_base64"])
+                    class DummyResult:
+                        def __init__(self, s):
+                            self.standard = s
+                            self.hd = s
+                        def __iter__(self):
+                            return iter((self.standard, self.hd, None, None, None, None))
+                    return DummyResult(standard_img)
+                else:
+                    print(f"API Human Matting Error: {res.text[:500]}")
+                    raise APIError("Error calling /human_matting API")
+            except Exception as e:
+                print(f"API Proxy Error (Matting): {str(e)}")
+                raise APIError(str(e))
+
         else:
             # 请求完整证件照接口
             payload = {
@@ -418,10 +424,24 @@ class IDPhotoProcessor:
                 "sharpen_strength": sharpen_strength,
                 "saturation_strength": saturation_strength,
             }
-            res = requests.post(f"{api_url}/idphoto", data=payload)
-            if res.status_code == 200 and res.json().get("status"):
-                standard_img = base64_2_numpy(res.json()["image_base64_standard"])
-                hd_img = base64_2_numpy(res.json()["image_base64_hd"])
+            try:
+                import time
+                start_time = time.time()
+                res = requests.post(f"{api_url}/idphoto", data=payload, timeout=120)
+                duration = time.time() - start_time
+                print(f"API Request took {duration:.2f}s, status: {res.status_code}")
+                
+                if res.status_code != 200:
+                    print(f"API Error Response: {res.text[:500]}")
+                    raise APIError(f"API returned status {res.status_code}")
+                
+                data = res.json()
+                if not data.get("status"):
+                    print("API returned status: False (Face Detection Failed?)")
+                    raise APIError("API returned status: False")
+
+                standard_img = base64_2_numpy(data["image_base64_standard"])
+                hd_img = base64_2_numpy(data["image_base64_hd"])
 
                 class DummyResult:
                     def __init__(self, s, h):
@@ -430,8 +450,10 @@ class IDPhotoProcessor:
                     def __iter__(self):
                         return iter((self.standard, self.hd, None, None, None, None))
                 return DummyResult(standard_img, hd_img)
-            else:
-                raise APIError("Error calling /idphoto API or No Face Detected")
+            except Exception as e:
+                print(f"API Proxy Error: {str(e)}")
+                raise APIError(str(e))
+
 
     # 处理照片生成错误
     def _handle_photo_generation_error(self, language):
